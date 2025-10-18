@@ -57,11 +57,14 @@ app.use('/api/mpesa', require('./routes/mpesaRoutes'));
 
 // Serve static files from the React app build directory
 if (process.env.NODE_ENV === 'production') {
+  console.log('Serving static files from:', path.join(__dirname, '../client/dist'));
   app.use(express.static(path.join(__dirname, '../client/dist')));
 
   // Catch all handler: send back React's index.html file for client-side routing
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+    const indexPath = path.join(__dirname, '../client/dist/index.html');
+    console.log('Serving index.html from:', indexPath);
+    res.sendFile(indexPath);
   });
 }
 
