@@ -56,6 +56,7 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/mpesa', require('./routes/mpesaRoutes'));
 
 // Serve static files from the React app build directory
+console.log('NODE_ENV:', process.env.NODE_ENV);
 if (process.env.NODE_ENV === 'production') {
   console.log('Serving static files from:', path.join(__dirname, '../client/dist'));
   app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -66,6 +67,8 @@ if (process.env.NODE_ENV === 'production') {
     console.log('Serving index.html from:', indexPath);
     res.sendFile(indexPath);
   });
+} else {
+  console.log('Development mode: static files not served');
 }
 
 // Error handler middleware (must be last)
