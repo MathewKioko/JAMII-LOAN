@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
+const path = require('path');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -53,6 +54,16 @@ app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/loan', require('./routes/loanRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/mpesa', require('./routes/mpesaRoutes'));
+
+// Serve static files from the React app build directory
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static('../client/dist'));
+
+  // Catch all handler: send back React's index.html file for client-side routing
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  });
+}
 
 // Error handler middleware (must be last)
 app.use(errorHandler);
