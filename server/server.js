@@ -48,13 +48,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/user', require('./routes/userRoutes'));
-app.use('/api/loan', require('./routes/loanRoutes'));
-app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/mpesa', require('./routes/mpesaRoutes'));
-
 // Serve static files from the React app build directory
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -64,6 +57,13 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
   });
 }
+
+// Routes
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/user', require('./routes/userRoutes'));
+app.use('/api/loan', require('./routes/loanRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/mpesa', require('./routes/mpesaRoutes'));
 
 // Error handler middleware (must be last)
 app.use(errorHandler);
