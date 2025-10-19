@@ -3,21 +3,21 @@
 ## Backend Enhancements
 
 ### Models
-- [ ] Create Notification model (server/models/Notification.js)
-- [ ] Update Loan model with auto-approval and disbursement fields (server/models/Loan.js)
+- [x] Create Notification model (server/models/Notification.js)
+- [x] Update Loan model with auto-approval and disbursement fields (server/models/Loan.js)
 
 ### Controllers
-- [ ] Add autoApproveLoan method to adminController.js
-- [ ] Add getLoanQueue method to adminController.js
-- [ ] Add initiateLoanDisbursement method to adminController.js
-- [ ] Add getAdminStats method to adminController.js
-- [ ] Add sendApprovalNotification method to adminController.js
+- [x] Add autoApproveLoan method to adminController.js
+- [x] Add getLoanQueue method to adminController.js
+- [x] Add initiateLoanDisbursement method to adminController.js
+- [x] Add getAdminStats method to adminController.js
+- [x] Add sendApprovalNotification method to adminController.js
 
 ### Utils
-- [ ] Extend M-PESA utils for B2C disbursements (server/utils/mpesa.js)
+- [x] Extend M-PESA utils for B2C disbursements (server/utils/mpesa.js)
 
 ### Routes
-- [ ] Add new admin routes (server/routes/adminRoutes.js)
+- [x] Add new admin routes (server/routes/adminRoutes.js)
 
 ## Frontend Enhancements
 
@@ -40,7 +40,7 @@
 - [x] Add proper error handling and loading states throughout
 
 ## Testing & Validation
-- [ ] Test auto-approval logic with sample data
-- [ ] Test M-PESA disbursement integration
+- [x] Test auto-approval logic with sample data
+- [x] Test M-PESA disbursement integration
 - [ ] Verify real-time polling and notifications
 - [ ] Add proper error handling and loading states
