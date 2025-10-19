@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Loan = require('../models/Loan');
+const Notification = require('../models/Notification');
 
 // @desc    Get user profile
 // @route   GET /api/user/profile
@@ -120,8 +121,27 @@ const getLoanHistory = async (req, res, next) => {
   }
 };
 
+// @desc    Get user notifications
+// @route   GET /api/user/notifications
+// @access  Private
+const getNotifications = async (req, res, next) => {
+  try {
+    const notifications = await Notification.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate('loanId', 'amount status');
+
+    res.json({
+      success: true,
+      data: notifications,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProfile,
   checkEligibility,
   getLoanHistory,
+  getNotifications,
 };

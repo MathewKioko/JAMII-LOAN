@@ -3,6 +3,7 @@ const {
   getProfile,
   checkEligibility,
   getLoanHistory,
+  getNotifications,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/auth');
 
@@ -19,5 +20,8 @@ router.get('/eligibility', checkEligibility);
 
 // @route   GET /api/user/loans
 router.get('/loans', getLoanHistory);
+
+// @route   GET /api/user/notifications
+router.get('/notifications', getNotifications);
 
 module.exports = router;

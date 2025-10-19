@@ -48,6 +48,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Serve static files from the React app build directory
+console.log('NODE_ENV:', process.env.NODE_ENV);
+if (process.env.NODE_ENV === 'production') {
+  console.log('Serving static files from:', path.join(__dirname, '../client/dist'));
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+}
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/user', require('./routes/userRoutes'));
@@ -55,20 +62,22 @@ app.use('/api/loan', require('./routes/loanRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/mpesa', require('./routes/mpesaRoutes'));
 
-// Serve static files from the React app build directory
-console.log('NODE_ENV:', process.env.NODE_ENV);
+// Catch all handler: send back React's index.html file for client-side routing
 if (process.env.NODE_ENV === 'production') {
-  console.log('Serving static files from:', path.join(__dirname, '../client/dist'));
-  app.use(express.static(path.join(__dirname, '../client/dist')));
-
-  // Catch all handler: send back React's index.html file for client-side routing
   app.get('*', (req, res) => {
     const indexPath = path.join(__dirname, '../client/dist/index.html');
     console.log('Serving index.html from:', indexPath);
     res.sendFile(indexPath);
   });
 } else {
-  console.log('Development mode: static files not served');
+  // In development, serve static files but ensure API routes are handled first
+  console.log('Development mode: serving static files');
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+  app.get('*', (req, res) => {
+    const indexPath = path.join(__dirname, '../client/dist/index.html');
+    console.log('Serving index.html from:', indexPath);
+    res.sendFile(indexPath);
+  });
 }
 
 // Error handler middleware (must be last)
