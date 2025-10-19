@@ -29,14 +29,19 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Root endpoint
+// Root endpoint - serve React app in production, API info in development
 app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'JAMII LOAN API is running',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-  });
+  if (process.env.NODE_ENV === 'production') {
+    const indexPath = path.join(__dirname, '../client/dist/index.html');
+    res.sendFile(indexPath);
+  } else {
+    res.json({
+      success: true,
+      message: 'JAMII LOAN API is running',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+    });
+  }
 });
 
 // Health check endpoint
