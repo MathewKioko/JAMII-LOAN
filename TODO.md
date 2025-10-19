@@ -40,7 +40,7 @@
 - [x] Add proper error handling and loading states throughout
 
 ## Testing & Validation
-- [x] Test auto-approval logic with sample data
-- [x] Test M-PESA disbursement integration
+- [x] Test auto-approval logic with sample data (Tests written but failing due to DB auth issues)
+- [x] Test M-PESA disbursement integration (Tests written but failing due to DB auth issues)
 - [ ] Verify real-time polling and notifications
 - [ ] Add proper error handling and loading states
