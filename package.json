@@ -32,6 +32,7 @@
   },
   "homepage": "https://github.com/yourusername/jamii-loan#readme",
   "dependencies": {
+    "mongodb": "^6.20.0",
     "nodemailer": "^7.0.9"
   }
 }
