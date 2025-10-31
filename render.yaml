@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: jamii-loan-backend
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGO_URI
+        fromSecret: mongo_uri
+      - key: JWT_SECRET
+        fromSecret: jwt_secret
+      - key: EMAIL_USER
+        fromSecret: email_user
+      - key: EMAIL_PASS
+        fromSecret: email_pass
+      - key: FLUTTERWAVE_PUBLIC_KEY
+        fromSecret: flutterwave_public_key
+      - key: FLUTTERWAVE_SECRET_KEY
+        fromSecret: flutterwave_secret_key
+      - key: FRONTEND_URL
+        value: https://jamii-loan.netlify.app

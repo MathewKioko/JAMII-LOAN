@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://jamii-loan-i2yo.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://jamii-loan-backend.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
