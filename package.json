@@ -2,7 +2,7 @@
   "name": "jamii-loan",
   "version": "1.0.0",
   "description": "A full-stack loan application system with M-PESA integration",
-  "main": "src/server.js",
+  "main": "server/index.js",
   "scripts": {
     "install-all": "npm install && cd server && npm install && cd ../client && npm install",
     "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
