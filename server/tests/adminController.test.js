@@ -14,6 +14,11 @@ describe('Admin Controller Tests', () => {
     // Connect to test database
     await mongoose.connect(process.env.MONGO_URI);
 
+    // Clean up before creating test data
+    await User.deleteMany({});
+    await Loan.deleteMany({});
+    await Notification.deleteMany({});
+
     // Create test user
     testUser = await User.create({
       fullName: 'Test User',
