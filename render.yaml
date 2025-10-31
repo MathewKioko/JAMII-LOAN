@@ -8,17 +8,17 @@ services:
     startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
       - key: PORT
-        value: 10000
+        value: 5000
       - key: MONGO_URI
-        fromSecret: mongo_uri
+        fromSecret: mongodb+srv://Mathew:Mat2018@quickloan.ownvxer.mongodb.net/?retryWrites=true&w=majority&appName=QUICKLOAN
       - key: JWT_SECRET
-        fromSecret: jwt_secret
+        fromSecret: qawsedrftgyhujikolp
       - key: EMAIL_USER
-        fromSecret: email_user
+        fromSecret: kiokomathew1985@gmail.com
       - key: EMAIL_PASS
-        fromSecret: email_pass
+        fromSecret: gmugaohtzrktcjjz
       - key: FLUTTERWAVE_PUBLIC_KEY
         fromSecret: flutterwave_public_key
       - key: FLUTTERWAVE_SECRET_KEY
