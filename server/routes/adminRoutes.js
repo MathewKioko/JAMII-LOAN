@@ -4,6 +4,7 @@ const {
   approveLoan,
   rejectLoan,
   autoApproveLoan,
+  specialApproveLoan,
   getLoanQueue,
   initiateLoanDisbursement,
   getAdminStats,
@@ -28,6 +29,9 @@ router.patch('/loan/:id/reject', rejectLoan);
 
 // @route   PATCH /api/admin/loan/:id/auto-approve
 router.patch('/loan/:id/auto-approve', autoApproveLoan);
+
+// @route   PATCH /api/admin/loan/:id/special-approve
+router.patch('/loan/:id/special-approve', specialApproveLoan);
 
 // @route   GET /api/admin/loan-queue
 router.get('/loan-queue', getLoanQueue);

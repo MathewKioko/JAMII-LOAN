@@ -37,6 +37,14 @@ const loanSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isSpecialApproved: {
+    type: Boolean,
+    default: false,
+  },
+  specialApprovedAt: {
+    type: Date,
+    default: null,
+  },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

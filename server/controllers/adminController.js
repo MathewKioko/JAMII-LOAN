@@ -62,13 +62,13 @@ const approveLoan = async (req, res, next) => {
       });
     }
 
-    // Check if fee is paid - temporarily bypass for testing
-    // if (!loan.feePaid) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: 'Loan fee must be paid before approval',
-    //   });
-    // }
+    // Check if fee is paid
+    if (!loan.feePaid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Loan fee must be paid before approval',
+      });
+    }
 
     // Update loan status
     loan.status = 'approved';
@@ -443,11 +443,75 @@ const sendApprovalNotification = async (req, res, next) => {
   }
 };
 
+// @desc    Special approve loan (bypasses normal criteria)
+// @route   PATCH /api/admin/loan/:id/special-approve
+// @access  Private/Admin
+const specialApproveLoan = async (req, res, next) => {
+  try {
+    const loan = await Loan.findById(req.params.id).populate('userId');
+
+    if (!loan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loan not found',
+      });
+    }
+
+    if (loan.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Loan is not in pending status',
+      });
+    }
+
+    // Update loan status for special approval
+    loan.status = 'approved';
+    loan.isSpecialApproved = true;
+    loan.specialApprovedAt = new Date();
+    loan.approvedBy = req.user._id;
+    loan.approvalDate = new Date();
+    await loan.save();
+
+    // Update user credit score and approved loans count
+    const user = loan.userId;
+    user.creditScore = Math.min(user.creditScore + 100, 1000); // Higher increase for special approval
+    user.totalLoansApproved += 1;
+    await user.save();
+
+    // Send special approval notification
+    await Notification.create({
+      userId: user._id,
+      loanId: loan._id,
+      type: 'loan_approved',
+      title: 'Loan Specially Approved',
+      message: `Congratulations! Your loan of KSh ${loan.amount.toLocaleString()} has been specially approved by our admin team. Funds will be disbursed shortly.`,
+      metadata: {
+        amount: loan.amount,
+        specialApproved: true,
+      },
+    });
+
+    // Send approval email asynchronously
+    sendLoanApprovalEmail(user, loan).catch(emailError => {
+      console.error('Failed to send loan approval email:', emailError);
+    });
+
+    res.json({
+      success: true,
+      message: 'Loan specially approved successfully',
+      data: loan,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllLoans,
   approveLoan,
   rejectLoan,
   autoApproveLoan,
+  specialApproveLoan,
   getLoanQueue,
   initiateLoanDisbursement,
   getAdminStats,

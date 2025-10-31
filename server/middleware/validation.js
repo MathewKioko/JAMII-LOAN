@@ -1,3 +1,5 @@
+const { validateKenyanID } = require('../utils/idValidator');
+
 const validateRegister = (req, res, next) => {
   const { fullName, email, nationalId, password, isCitizen } = req.body;
 
@@ -15,9 +17,8 @@ const validateRegister = (req, res, next) => {
   }
 
   // Validate nationalId
-  const nationalIdRegex = /^\d+$/;
-  if (!nationalId || !nationalIdRegex.test(nationalId) || nationalId.length !== 8) {
-    errors.push('National ID must be exactly 8 digits');
+  if (!nationalId || !validateKenyanID(nationalId)) {
+    errors.push('Please provide a valid Kenyan National ID (9 digits with valid checksum)');
   }
 
   // Validate password

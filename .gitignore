@@ -91,3 +91,6 @@ jspm_packages/
 # Temporary folders
 tmp/
 temp/
+
+# Local Netlify folder
+.netlify

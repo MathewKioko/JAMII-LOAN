@@ -77,6 +77,7 @@ app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/loan', require('./routes/loanRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/mpesa', require('./routes/mpesaRoutes'));
+app.use('/api/payment', require('./routes/paymentRoutes'));
 
 // Catch all handler: send back React's index.html file for client-side routing
 if (process.env.NODE_ENV === 'production') {

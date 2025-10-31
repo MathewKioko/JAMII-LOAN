@@ -10,6 +10,7 @@ const AdminDashboard = () => {
     approveLoanAdmin,
     rejectLoanAdmin,
     autoApproveLoanAdmin,
+    specialApproveLoanAdmin,
     getLoanQueue,
     initiateLoanDisbursement,
     getAdminStats,

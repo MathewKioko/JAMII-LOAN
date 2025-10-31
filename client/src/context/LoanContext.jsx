@@ -121,6 +121,20 @@ export const LoanProvider = ({ children }) => {
     }
   };
 
+  // Special approve loan (admin)
+  const specialApproveLoanAdmin = async (loanId) => {
+    try {
+      setLoading(true);
+      const response = await api.patch(`/admin/loan/${loanId}/special-approve`);
+      return { success: true, data: response.data.data };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to special approve loan';
+      return { success: false, message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Get loan queue (admin)
   const getLoanQueue = async () => {
     try {
@@ -188,6 +202,7 @@ export const LoanProvider = ({ children }) => {
     approveLoanAdmin,
     rejectLoanAdmin,
     autoApproveLoanAdmin,
+    specialApproveLoanAdmin,
     getLoanQueue,
     initiateLoanDisbursement,
     getAdminStats,

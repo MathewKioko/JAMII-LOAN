@@ -87,7 +87,7 @@ const applyForLoan = async (req, res, next) => {
 // @access  Private
 const payLoanFee = async (req, res, next) => {
   try {
-    const { phoneNumber } = req.body;
+    const { paymentMethod = 'mock', paymentData } = req.body;
     const loanId = req.params.id;
     const userId = req.user._id;
 
@@ -121,34 +121,45 @@ const payLoanFee = async (req, res, next) => {
       });
     }
 
-    // Initiate M-PESA STK Push for fee payment
+    // Use alternative payment methods
+    const { processLoanFeePayment } = require('../utils/paymentAlternatives');
+
     try {
-      const mpesaResponse = await initiateStkPush(phoneNumber, loan.feeAmount, loan._id);
+      const paymentResponse = await processLoanFeePayment(
+        paymentMethod,
+        paymentData,
+        loan.feeAmount,
+        loan._id
+      );
 
       // Create transaction record
       await Transaction.create({
         userId,
         loanId: loan._id,
         amount: loan.feeAmount,
-        mpesaResponse,
-        phoneNumber,
+        mpesaResponse: paymentResponse,
+        phoneNumber: paymentData?.phoneNumber || paymentData?.reference,
       });
 
-      // Update loan with transaction ID
-      loan.mpesaTransactionId = mpesaResponse.checkoutRequestID;
+      // Update loan with transaction ID and mark fee as paid
+      loan.mpesaTransactionId = paymentResponse.transactionId || paymentResponse.checkoutRequestID;
+      loan.feePaid = true; // Mark as paid since we're using mock/demo payments
       await loan.save();
 
       res.json({
         success: true,
-        message: 'Fee payment initiated. Please complete the M-PESA payment.',
+        message: `Fee payment initiated via ${paymentMethod.toUpperCase()}. Payment processed successfully.`,
         data: {
-          mpesaResponse,
+          paymentResponse,
+          paymentMethod,
         },
       });
-    } catch (mpesaError) {
+    } catch (paymentError) {
+      console.error('Payment processing error:', paymentError);
       return res.status(500).json({
         success: false,
         message: 'Failed to initiate payment. Please try again.',
+        error: paymentError.message,
       });
     }
   } catch (error) {
