@@ -8,20 +8,8 @@ services:
     startCommand: cd server && node index.js
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
       - key: PORT
         value: 5000
-      - key: MONGO_URI
-        fromSecret: mongodb+srv://Mathew:Mat2018@quickloan.ownvxer.mongodb.net/?retryWrites=true&w=majority&appName=QUICKLOAN
-      - key: JWT_SECRET
-        fromSecret: qawsedrftgyhujikolp
-      - key: EMAIL_USER
-        fromSecret: kiokomathew1985@gmail.com
-      - key: EMAIL_PASS
-        fromSecret: gmugaohtzrktcjjz
-      - key: FLUTTERWAVE_PUBLIC_KEY
-        fromSecret: flutterwave_public_key
-      - key: FLUTTERWAVE_SECRET_KEY
-        fromSecret: flutterwave_secret_key
       - key: FRONTEND_URL
         value: https://jamii-loan.netlify.app
