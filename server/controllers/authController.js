@@ -60,9 +60,10 @@ const register = async (req, res, next) => {
 
     if (user) {
       // Send welcome email asynchronously (don't wait for it to complete)
-      sendWelcomeEmail(user).catch(emailError => {
-        console.error('Failed to send welcome email:', emailError);
-      });
+      // Temporarily disabled for production testing
+      // sendWelcomeEmail(user).catch(emailError => {
+      //   console.error('Failed to send welcome email:', emailError);
+      // });
 
       res.status(201).json({
         success: true,
