@@ -57,7 +57,8 @@ const Login = () => {
     const result = await login(formData);
 
     if (result.success) {
-      navigate(from, { replace: true });
+      const redirectTo = result.data.role === 'admin' ? '/admin' : from;
+      navigate(redirectTo, { replace: true });
     } else {
       setErrors({ general: result.message });
     }
