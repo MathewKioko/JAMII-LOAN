@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: jamii-loan-backend
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm run install-all && npm run build
+    startCommand: cd server && node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: FRONTEND_URL
+        value: https://jamii-loan.netlify.app
+      - key: MONGO_URI
+        value: mongodb+srv://Mathew:Mat2018@quickloan.ownvxer.mongodb.net/?retryWrites=true&w=majority&appName=QUICKLOAN
+      - key: JWT_SECRET
+        value: your_jwt_secret_here
+      - key: EMAIL_USER
+        value: your_email@example.com
+      - key: EMAIL_PASS
+        value: your_email_password
+      - key: FLUTTERWAVE_PUBLIC_KEY
+        value: your_flutterwave_public_key
+      - key: FLUTTERWAVE_SECRET_KEY
+        value: your_flutterwave_secret_key
+      - key: MPESA_CONSUMER_KEY
+        value: your_mpesa_consumer_key
+      - key: MPESA_CONSUMER_SECRET
+        value: your_mpesa_consumer_secret
+      - key: MPESA_SHORTCODE
+        value: your_mpesa_shortcode
+      - key: MPESA_PASSKEY
+        value: your_mpesa_passkey
