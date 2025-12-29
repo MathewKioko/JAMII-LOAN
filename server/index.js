@@ -31,8 +31,8 @@ app.use(helmet({
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? process.env.FRONTEND_URL
-    : ['http://localhost:3000', 'http://localhost:3004', 'http://localhost:3007', 'https://jamii-loan.netlify.app'],
+    ? [process.env.FRONTEND_URL, 'https://jamii-loan.vercel.app', 'https://jamii-loan.netlify.app']
+    : ['http://localhost:3000', 'http://localhost:3004', 'http://localhost:3007', 'https://jamii-loan.vercel.app', 'https://jamii-loan.netlify.app'],
   credentials: true,
 }));
 
