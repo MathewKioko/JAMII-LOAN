@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "public",
-  "framework": null,
+  "framework": "vite",
   "installCommand": "npm run install-all",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
