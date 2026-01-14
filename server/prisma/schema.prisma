@@ -1,0 +1,103 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  email             String    @unique
+  passwordHash      String
+  role              String    @default("USER")
+  fullName          String?
+  nationalId        String?
+  isCitizen         Boolean   @default(true)
+  creditScore       Int       @default(500)
+  totalLoansApplied Int       @default(0)
+  totalLoansApproved Int      @default(0)
+  loanLimit         Float     @default(50000)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  lastLogin         DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  loans             Loan[]
+  notifications     Notification[]
+  approvedLoans     Loan[]    @relation("ApprovedBy")
+
+  @@map("users")
+}
+
+model Loan {
+  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId                  String    @db.ObjectId
+  amount                  Float
+  status                  String    @default("pending")
+  feePaid                 Boolean   @default(false)
+  feeAmount               Float     @default(0)
+  mpesaTransactionId      String?
+  isAutoApproved          Boolean   @default(false)
+  autoApprovedAt          DateTime?
+  isSpecialApproved       Boolean   @default(false)
+  specialApprovedAt       DateTime?
+  approvedBy              String?   @db.ObjectId
+  approvalDate            DateTime?
+  rejectionReason         String?
+  disbursementStatus      String    @default("pending")
+  disbursementTransactionId String?
+  disbursedAt             DateTime?
+  description             String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relations
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approvedByAdmin         User?     @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  notifications           Notification[]
+
+  @@index([userId, status])
+  @@index([status])
+  @@map("loans")
+}
+
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  loanId    String?  @db.ObjectId
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loan      Loan?    @relation(fields: [loanId], references: [id], onDelete: SetNull)
+
+  @@map("notifications")
+}
+
+model Transaction {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String   @db.ObjectId
+  loanId               String?  @db.ObjectId
+  amount               Float
+  type                 String
+  status               String   @default("pending")
+  transactionId        String?
+  mpesaReceiptNumber   String?
+  mpesaResponse        Json?    // Added for storing M-PESA callback response
+  phoneNumber          String?
+  description          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("transactions")
+}

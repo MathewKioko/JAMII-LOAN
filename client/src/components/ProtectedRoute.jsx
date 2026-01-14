@@ -20,7 +20,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   }
 
   // Check admin role if adminOnly is true
-  if (adminOnly && user?.role !== 'admin') {
+  if (adminOnly && user?.role !== 'SUPER_ADMIN') {
     return <Navigate to="/dashboard" replace />;
   }
 

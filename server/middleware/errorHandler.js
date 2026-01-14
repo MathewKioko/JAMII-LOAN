@@ -24,6 +24,26 @@ const errorHandler = (err, req, res, next) => {
     error = { message, statusCode: 400 };
   }
 
+  // Prisma error handling
+  if (err.code === 'P2002') {
+    // Unique constraint violation
+    const field = err.meta?.target?.[0] || 'field';
+    const message = `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`;
+    error = { message, statusCode: 400 };
+  }
+
+  if (err.code === 'P2025') {
+    // Record not found
+    const message = 'Resource not found';
+    error = { message, statusCode: 404 };
+  }
+
+  if (err.code === 'P2003') {
+    // Foreign key constraint violation
+    const message = 'Referenced resource does not exist';
+    error = { message, statusCode: 400 };
+  }
+
   // JWT errors
   if (err.name === 'JsonWebTokenError') {
     const message = 'Invalid token';

@@ -1,12 +1,12 @@
 const express = require('express');
 const { applyForLoan, payLoanFee } = require('../controllers/loanController');
-const { protect } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const { validateLoanApplication } = require('../middleware/validation');
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(protect);
+router.use(requireAuth);
 
 // @route   POST /api/loan/apply
 router.post('/apply', validateLoanApplication, applyForLoan);

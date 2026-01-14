@@ -5,12 +5,12 @@ const {
   getLoanHistory,
   getNotifications,
 } = require('../controllers/userController');
-const { protect } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(protect);
+router.use(requireAuth);
 
 // @route   GET /api/user/profile
 router.get('/profile', getProfile);

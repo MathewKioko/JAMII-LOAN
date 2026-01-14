@@ -97,7 +97,7 @@ const Dashboard = () => {
               <TrendingUp className="h-8 w-8 text-secondary-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Loan Limit</p>
-                <p className="text-2xl font-bold text-gray-900">KSh {stats.loanLimit.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">KSh {(stats.loanLimit || 0).toLocaleString()}</p>
               </div>
             </div>
           </div>

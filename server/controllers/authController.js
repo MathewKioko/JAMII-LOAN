@@ -1,13 +1,23 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const { sendWelcomeEmail } = require('../utils/email');
+const prisma = require('../config/prisma');
 
-// Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
-  });
+// Generate JWT Access Token
+const generateAccessToken = (userId, role) => {
+  return jwt.sign(
+    { userId, role },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: '15m' }
+  );
+};
+
+// Generate JWT Refresh Token
+const generateRefreshToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: '7d' }
+  );
 };
 
 // @desc    Register user
@@ -15,77 +25,61 @@ const generateToken = (id) => {
 // @access  Public
 const register = async (req, res, next) => {
   try {
-    console.log('Registration attempt:', { fullName: req.body.fullName, email: req.body.email, nationalId: req.body.nationalId });
-    const { fullName, email, nationalId, password, isCitizen } = req.body;
+    const { email, password, fullName, nationalId, isCitizen } = req.body;
 
     // Check if user exists
-    const userExists = await User.findOne({
-      $or: [{ email }, { nationalId }],
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
     });
 
-    if (userExists) {
-      console.log('User already exists:', userExists.email, userExists.nationalId);
+    if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email or national ID',
+        message: 'User with this email already exists'
       });
     }
 
     // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(password, salt);
 
-    console.log('Creating user with data:', {
-      fullName,
-      email,
-      nationalId,
-      isCitizen,
-      hashedPassword: hashedPassword ? 'hashed' : 'null'
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        fullName: fullName || null,
+        nationalId: nationalId || null,
+        isCitizen: isCitizen !== undefined ? isCitizen : true,
+        role: 'USER'
+      }
     });
 
-    // Create user - check if admin email
-    const isAdmin = email === 'admin@jamii.com' || email === 'newadmin@jamii.com';
-    const user = await User.create({
-      fullName,
-      email,
-      nationalId,
-      password: hashedPassword,
-      isCitizen,
-      role: isAdmin ? 'admin' : 'user',
-      creditScore: isAdmin ? 1000 : 500,
-      loanLimit: isAdmin ? 1000000 : 50000,
+    // Generate tokens
+    const accessToken = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id);
+
+    // Set refresh token as httpOnly cookie
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    console.log('User created successfully:', user._id);
-
-    if (user) {
-      // Send welcome email asynchronously (don't wait for it to complete)
-      // Temporarily disabled for production testing
-      // sendWelcomeEmail(user).catch(emailError => {
-      //   console.error('Failed to send welcome email:', emailError);
-      // });
-
-      res.status(201).json({
-        success: true,
-        message: 'User registered successfully',
-        data: {
-          _id: user._id,
-          fullName: user.fullName,
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      data: {
+        user: {
+          id: user.id,
           email: user.email,
-          nationalId: user.nationalId,
-          isCitizen: user.isCitizen,
-          creditScore: user.creditScore,
-          role: user.role,
-          loanLimit: user.loanLimit,
-          token: generateToken(user._id),
+          fullName: user.fullName,
+          role: user.role
         },
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid user data',
-      });
-    }
+        accessToken
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -96,37 +90,160 @@ const register = async (req, res, next) => {
 // @access  Public
 const login = async (req, res, next) => {
   try {
-    console.log('Login attempt for email:', req.body.email);
     const { email, password } = req.body;
 
-    // Check for user email
-    const user = await User.findOne({ email }).select('+password');
-    console.log('User found:', user ? user._id : 'null');
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      console.log('Password match successful for user:', user._id);
-      res.json({
-        success: true,
-        message: 'Login successful',
-        data: {
-          _id: user._id,
-          fullName: user.fullName,
-          email: user.email,
-          nationalId: user.nationalId,
-          isCitizen: user.isCitizen,
-          creditScore: user.creditScore,
-          role: user.role,
-          loanLimit: user.loanLimit,
-          token: generateToken(user._id),
-        },
-      });
-    } else {
-      console.log('Login failed: invalid credentials for email:', email);
-      res.status(401).json({
+    if (!user) {
+      return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
+        message: 'Invalid credentials'
       });
     }
+
+    // Check password
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
+
+    // Generate tokens
+    const accessToken = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id);
+
+    // Set refresh token as httpOnly cookie
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role
+        },
+        accessToken
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public
+const refreshToken = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token not provided'
+      });
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Generate new access token
+    const accessToken = generateAccessToken(user.id, user.role);
+
+    res.json({
+      success: true,
+      data: {
+        accessToken
+      }
+    });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      message: 'Invalid refresh token'
+    });
+  }
+};
+
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+const logout = async (req, res, next) => {
+  try {
+    // Clear refresh token cookie
+    res.clearCookie('refreshToken');
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get current user profile
+// @route   GET /api/auth/me
+// @access  Private
+const getMe = async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        nationalId: true,
+        role: true,
+        creditScore: true,
+        loanLimit: true,
+        totalLoansApplied: true,
+        totalLoansApproved: true,
+        lastLogin: true,
+        createdAt: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { user }
+    });
   } catch (error) {
     next(error);
   }
@@ -135,4 +252,7 @@ const login = async (req, res, next) => {
 module.exports = {
   register,
   login,
+  refreshToken,
+  logout,
+  getMe
 };

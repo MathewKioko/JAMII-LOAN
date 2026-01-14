@@ -1,30 +1,39 @@
-const User = require('../models/User');
-const Loan = require('../models/Loan');
-const Notification = require('../models/Notification');
+const prisma = require('../config/prisma');
+const { PrismaClientValidationError } = require('@prisma/client/runtime/library');
 
 // @desc    Get user profile
 // @route   GET /api/user/profile
 // @access  Private
 const getProfile = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        nationalId: true,
+        isCitizen: true,
+        creditScore: true,
+        role: true,
+        totalLoansApplied: true,
+        totalLoansApproved: true,
+        loanLimit: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
 
     res.json({
       success: true,
-      data: {
-        _id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        nationalId: user.nationalId,
-        isCitizen: user.isCitizen,
-        creditScore: user.creditScore,
-        role: user.role,
-        totalLoansApplied: user.totalLoansApplied,
-        totalLoansApproved: user.totalLoansApproved,
-        loanLimit: user.loanLimit,
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-      },
+      data: user,
     });
   } catch (error) {
     next(error);
@@ -34,14 +43,20 @@ const getProfile = async (req, res, next) => {
 // @desc    Check loan eligibility
 // @route   GET /api/user/eligibility
 // @access  Private
-// @desc    Check loan eligibility
-// @route   GET /api/user/eligibility
-// @access  Private
 const checkEligibility = async (req, res, next) => {
   try {
-    console.log('Checking eligibility for user:', req.user._id);
-    const user = await User.findById(req.user._id);
+    console.log('Checking eligibility for user:', req.user.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+    });
     console.log('User found:', user ? user.fullName : 'null');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
 
     // Check if user is Kenyan citizen
     if (!user.isCitizen) {
@@ -57,9 +72,11 @@ const checkEligibility = async (req, res, next) => {
     }
 
     // Check for pending or approved loans
-    const activeLoans = await Loan.find({
-      userId: user._id,
-      status: { $in: ['pending', 'approved'] },
+    const activeLoans = await prisma.loan.findMany({
+      where: {
+        userId: user.id,
+        status: { in: ['pending', 'approved'] },
+      },
     });
 
     if (activeLoans.length > 0) {
@@ -108,9 +125,15 @@ const checkEligibility = async (req, res, next) => {
 // @access  Private
 const getLoanHistory = async (req, res, next) => {
   try {
-    const loans = await Loan.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('approvedBy', 'fullName');
+    const loans = await prisma.loan.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        approvedByAdmin: {
+          select: { fullName: true },
+        },
+      },
+    });
 
     res.json({
       success: true,
@@ -126,9 +149,15 @@ const getLoanHistory = async (req, res, next) => {
 // @access  Private
 const getNotifications = async (req, res, next) => {
   try {
-    const notifications = await Notification.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('loanId', 'amount status');
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        loan: {
+          select: { amount: true, status: true },
+        },
+      },
+    });
 
     res.json({
       success: true,
@@ -145,3 +174,4 @@ module.exports = {
   getLoanHistory,
   getNotifications,
 };
+

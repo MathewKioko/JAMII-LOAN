@@ -14,7 +14,15 @@ import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function AppContent() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -52,7 +60,7 @@ function AppContent() {
         />
 
         {/* Default redirect */}
-        <Route path="/" element={<Navigate to={user?.role === 'admin' ? "/admin" : "/dashboard"} replace />} />
+        <Route path="/" element={<Navigate to={user?.role === 'SUPER_ADMIN' ? "/admin" : "/dashboard"} replace />} />
 
         {/* 404 route */}
         <Route path="*" element={<NotFound />} />

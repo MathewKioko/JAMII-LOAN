@@ -1,7 +1,4 @@
-const Loan = require('../models/Loan');
-const User = require('../models/User');
-const Transaction = require('../models/Transaction');
-const Notification = require('../models/Notification');
+const prisma = require('../config/prisma');
 const { initiateB2CDisbursement } = require('../utils/mpesa');
 const { sendLoanApprovalEmail, sendLoanRejectionEmail, sendLoanDisbursementEmail } = require('../utils/email');
 
@@ -12,19 +9,27 @@ const getAllLoans = async (req, res, next) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
 
-    let filter = {};
+    let where = {};
     if (status) {
-      filter.status = status;
+      where.status = status;
     }
 
-    const loans = await Loan.find(filter)
-      .populate('userId', 'fullName email nationalId')
-      .populate('approvedBy', 'fullName')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    const loans = await prisma.loan.findMany({
+      where,
+      include: {
+        user: {
+          select: { fullName: true, email: true, nationalId: true },
+        },
+        approvedByAdmin: {
+          select: { fullName: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit),
+      skip: (parseInt(page) - 1) * parseInt(limit),
+    });
 
-    const total = await Loan.countDocuments(filter);
+    const total = await prisma.loan.count({ where });
 
     res.json({
       success: true,
@@ -46,7 +51,12 @@ const getAllLoans = async (req, res, next) => {
 // @access  Private/Admin
 const approveLoan = async (req, res, next) => {
   try {
-    const loan = await Loan.findById(req.params.id).populate('userId');
+    const loan = await prisma.loan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: true,
+      },
+    });
 
     if (!loan) {
       return res.status(404).json({
@@ -71,26 +81,34 @@ const approveLoan = async (req, res, next) => {
     }
 
     // Update loan status
-    loan.status = 'approved';
-    loan.approvedBy = req.user._id;
-    loan.approvalDate = new Date();
-    await loan.save();
+    const updatedLoan = await prisma.loan.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'approved',
+        approvedBy: req.user.userId,
+        approvalDate: new Date(),
+      },
+    });
 
     // Update user credit score and approved loans count
-    const user = loan.userId;
-    user.creditScore = Math.min(user.creditScore + 50, 1000); // Increase by 50, max 1000
-    user.totalLoansApproved += 1;
-    await user.save();
+    const user = loan.user;
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        creditScore: Math.min(user.creditScore + 50, 1000), // Increase by 50, max 1000
+        totalLoansApproved: user.totalLoansApproved + 1,
+      },
+    });
 
     // Send approval email asynchronously
-    sendLoanApprovalEmail(user, loan).catch(emailError => {
+    sendLoanApprovalEmail(updatedUser, updatedLoan).catch(emailError => {
       console.error('Failed to send loan approval email:', emailError);
     });
 
     res.json({
       success: true,
       message: 'Loan approved successfully',
-      data: loan,
+      data: updatedLoan,
     });
   } catch (error) {
     next(error);
@@ -111,7 +129,9 @@ const rejectLoan = async (req, res, next) => {
       });
     }
 
-    const loan = await Loan.findById(req.params.id);
+    const loan = await prisma.loan.findUnique({
+      where: { id: req.params.id },
+    });
 
     if (!loan) {
       return res.status(404).json({
@@ -128,14 +148,20 @@ const rejectLoan = async (req, res, next) => {
     }
 
     // Update loan status
-    loan.status = 'rejected';
-    loan.rejectionReason = rejectionReason;
-    await loan.save();
+    const updatedLoan = await prisma.loan.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'rejected',
+        rejectionReason,
+      },
+    });
 
     // Send rejection email asynchronously
-    const user = await User.findById(loan.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: loan.userId },
+    });
     if (user) {
-      sendLoanRejectionEmail(user, loan).catch(emailError => {
+      sendLoanRejectionEmail(user, updatedLoan).catch(emailError => {
         console.error('Failed to send loan rejection email:', emailError);
       });
     }
@@ -143,7 +169,7 @@ const rejectLoan = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Loan rejected successfully',
-      data: loan,
+      data: updatedLoan,
     });
   } catch (error) {
     next(error);
@@ -155,7 +181,12 @@ const rejectLoan = async (req, res, next) => {
 // @access  Private/Admin
 const autoApproveLoan = async (req, res, next) => {
   try {
-    const loan = await Loan.findById(req.params.id).populate('userId');
+    const loan = await prisma.loan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: true,
+      },
+    });
 
     if (!loan) {
       return res.status(404).json({
@@ -172,14 +203,17 @@ const autoApproveLoan = async (req, res, next) => {
     }
 
     // Auto-approval criteria
-    const user = loan.userId;
+    const user = loan.user;
     const hasPaidFee = loan.feePaid;
     const hasValidId = user.isCitizen && user.nationalId;
     const hasGoodCredit = user.creditScore >= 600;
-    const hasNoPendingLoans = await Loan.countDocuments({
-      userId: user._id,
-      status: 'pending'
-    }) === 1; // Only this loan should be pending
+    const pendingLoansCount = await prisma.loan.count({
+      where: {
+        userId: user.id,
+        status: 'pending',
+      },
+    });
+    const hasNoPendingLoans = pendingLoansCount === 1; // Only this loan should be pending
 
     if (!hasPaidFee || !hasValidId || !hasGoodCredit || !hasNoPendingLoans) {
       return res.status(400).json({
@@ -195,33 +229,38 @@ const autoApproveLoan = async (req, res, next) => {
     }
 
     // Auto-approve the loan
-    loan.status = 'approved';
-    loan.isAutoApproved = true;
-    loan.autoApprovedAt = new Date();
-    await loan.save();
+    const updatedLoan = await prisma.loan.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'approved',
+        isAutoApproved: true,
+        autoApprovedAt: new Date(),
+      },
+    });
 
     // Update user credit score
-    user.creditScore = Math.min(user.creditScore + 25, 1000); // Smaller increase for auto-approval
-    user.totalLoansApproved += 1;
-    await user.save();
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        creditScore: Math.min(user.creditScore + 25, 1000), // Smaller increase for auto-approval
+        totalLoansApproved: user.totalLoansApproved + 1,
+      },
+    });
 
     // Send notification
-    await Notification.create({
-      userId: user._id,
-      loanId: loan._id,
-      type: 'loan_approved',
-      title: 'Loan Auto-Approved',
-      message: `Your loan of KSh ${loan.amount.toLocaleString()} has been automatically approved. Funds will be disbursed shortly.`,
-      metadata: {
-        amount: loan.amount,
-        autoApproved: true,
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        loanId: loan.id,
+        title: 'Loan Auto-Approved',
+        message: `Your loan of KSh ${loan.amount.toLocaleString()} has been automatically approved. Funds will be disbursed shortly.`,
       },
     });
 
     res.json({
       success: true,
       message: 'Loan auto-approved successfully',
-      data: loan,
+      data: updatedLoan,
     });
   } catch (error) {
     next(error);
@@ -233,10 +272,16 @@ const autoApproveLoan = async (req, res, next) => {
 // @access  Private/Admin
 const getLoanQueue = async (req, res, next) => {
   try {
-    const loans = await Loan.find({ status: 'pending' })
-      .populate('userId', 'fullName email nationalId creditScore')
-      .sort({ createdAt: 1 }) // FIFO order
-      .limit(50); // Limit to prevent overload
+    const loans = await prisma.loan.findMany({
+      where: { status: 'pending' },
+      include: {
+        user: {
+          select: { fullName: true, email: true, nationalId: true, creditScore: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' }, // FIFO order
+      take: 50, // Limit to prevent overload
+    });
 
     res.json({
       success: true,
@@ -252,7 +297,12 @@ const getLoanQueue = async (req, res, next) => {
 // @access  Private/Admin
 const initiateLoanDisbursement = async (req, res, next) => {
   try {
-    const loan = await Loan.findById(req.params.id).populate('userId');
+    const loan = await prisma.loan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: true,
+      },
+    });
 
     if (!loan) {
       return res.status(404).json({
@@ -276,35 +326,40 @@ const initiateLoanDisbursement = async (req, res, next) => {
     }
 
     // Update disbursement status
-    loan.disbursementStatus = 'processing';
-    await loan.save();
+    await prisma.loan.update({
+      where: { id: req.params.id },
+      data: {
+        disbursementStatus: 'processing',
+      },
+    });
 
     // Initiate M-PESA B2C disbursement
     try {
       const disbursementResult = await initiateB2CDisbursement(
-        loan.userId.nationalId, // Using nationalId as phone number for demo
+        loan.user.nationalId, // Using nationalId as phone number for demo
         loan.amount,
-        loan._id
+        loan.id
       );
 
-      loan.disbursementTransactionId = disbursementResult.transactionId;
-      await loan.save();
+      const updatedLoan = await prisma.loan.update({
+        where: { id: req.params.id },
+        data: {
+          disbursementTransactionId: disbursementResult.transactionId,
+        },
+      });
 
       // Send notification
-      await Notification.create({
-        userId: loan.userId._id,
-        loanId: loan._id,
-        type: 'loan_disbursed',
-        title: 'Loan Disbursed',
-        message: `Your loan of KSh ${loan.amount.toLocaleString()} has been disbursed to your M-PESA account.`,
-        metadata: {
-          amount: loan.amount,
-          transactionId: disbursementResult.transactionId,
+      await prisma.notification.create({
+        data: {
+          userId: loan.user.id,
+          loanId: loan.id,
+          title: 'Loan Disbursed',
+          message: `Your loan of KSh ${loan.amount.toLocaleString()} has been disbursed to your M-PESA account.`,
         },
       });
 
       // Send disbursement email asynchronously
-      sendLoanDisbursementEmail(loan.userId, loan).catch(emailError => {
+      sendLoanDisbursementEmail(loan.user, updatedLoan).catch(emailError => {
         console.error('Failed to send loan disbursement email:', emailError);
       });
 
@@ -312,14 +367,18 @@ const initiateLoanDisbursement = async (req, res, next) => {
         success: true,
         message: 'Loan disbursement initiated successfully',
         data: {
-          loan,
+          loan: updatedLoan,
           transactionId: disbursementResult.transactionId,
         },
       });
     } catch (disbursementError) {
       // Revert status on failure
-      loan.disbursementStatus = 'failed';
-      await loan.save();
+      await prisma.loan.update({
+        where: { id: req.params.id },
+        data: {
+          disbursementStatus: 'failed',
+        },
+      });
 
       throw disbursementError;
     }
@@ -340,26 +399,35 @@ const getAdminStats = async (req, res, next) => {
       rejectedLoans,
       totalUsers,
       activeUsers,
-      totalDisbursed,
       recentLoans,
     ] = await Promise.all([
-      Loan.countDocuments(),
-      Loan.countDocuments({ status: 'pending' }),
-      Loan.countDocuments({ status: 'approved' }),
-      Loan.countDocuments({ status: 'rejected' }),
-      User.countDocuments(),
-      User.countDocuments({ isActive: true }),
-      Loan.aggregate([
-        { $match: { status: 'approved', disbursementStatus: 'completed' } },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
-      ]),
-      Loan.find({ status: 'pending' })
-        .populate('userId', 'fullName')
-        .sort({ createdAt: -1 })
-        .limit(5),
+      prisma.loan.count(),
+      prisma.loan.count({ where: { status: 'pending' } }),
+      prisma.loan.count({ where: { status: 'approved' } }),
+      prisma.loan.count({ where: { status: 'rejected' } }),
+      prisma.user.count(),
+      prisma.user.count({ where: { isActive: true } }),
+      prisma.loan.findMany({
+        where: { status: 'pending' },
+        include: {
+          user: {
+            select: { fullName: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
     ]);
 
-    const disbursedAmount = totalDisbursed.length > 0 ? totalDisbursed[0].total : 0;
+    // Calculate total disbursed amount
+    const disbursedLoans = await prisma.loan.findMany({
+      where: {
+        status: 'approved',
+        disbursementStatus: 'completed',
+      },
+      select: { amount: true },
+    });
+    const totalDisbursed = disbursedLoans.reduce((sum, loan) => sum + loan.amount, 0);
 
     res.json({
       success: true,
@@ -375,7 +443,7 @@ const getAdminStats = async (req, res, next) => {
           active: activeUsers,
         },
         disbursements: {
-          totalAmount: disbursedAmount,
+          totalAmount: totalDisbursed,
         },
         recentPendingLoans: recentLoans,
       },
@@ -390,7 +458,12 @@ const getAdminStats = async (req, res, next) => {
 // @access  Private/Admin
 const sendApprovalNotification = async (req, res, next) => {
   try {
-    const loan = await Loan.findById(req.params.id).populate('userId');
+    const loan = await prisma.loan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: true,
+      },
+    });
 
     if (!loan) {
       return res.status(404).json({
@@ -407,10 +480,11 @@ const sendApprovalNotification = async (req, res, next) => {
     }
 
     // Check if notification already exists
-    const existingNotification = await Notification.findOne({
-      userId: loan.userId._id,
-      loanId: loan._id,
-      type: 'loan_approved',
+    const existingNotification = await prisma.notification.findFirst({
+      where: {
+        userId: loan.user.id,
+        loanId: loan.id,
+      },
     });
 
     if (existingNotification) {
@@ -421,15 +495,12 @@ const sendApprovalNotification = async (req, res, next) => {
     }
 
     // Send notification
-    const notification = await Notification.create({
-      userId: loan.userId._id,
-      loanId: loan._id,
-      type: 'loan_approved',
-      title: 'Loan Approved',
-      message: `Congratulations! Your loan application for KSh ${loan.amount.toLocaleString()} has been approved. ${loan.isAutoApproved ? 'This was automatically approved based on your eligibility.' : 'Please wait for disbursement.'}`,
-      metadata: {
-        amount: loan.amount,
-        autoApproved: loan.isAutoApproved,
+    const notification = await prisma.notification.create({
+      data: {
+        userId: loan.user.id,
+        loanId: loan.id,
+        title: 'Loan Approved',
+        message: `Congratulations! Your loan application for KSh ${loan.amount.toLocaleString()} has been approved. ${loan.isAutoApproved ? 'This was automatically approved based on your eligibility.' : 'Please wait for disbursement.'}`,
       },
     });
 
@@ -448,7 +519,12 @@ const sendApprovalNotification = async (req, res, next) => {
 // @access  Private/Admin
 const specialApproveLoan = async (req, res, next) => {
   try {
-    const loan = await Loan.findById(req.params.id).populate('userId');
+    const loan = await prisma.loan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: true,
+      },
+    });
 
     if (!loan) {
       return res.status(404).json({
@@ -465,41 +541,46 @@ const specialApproveLoan = async (req, res, next) => {
     }
 
     // Update loan status for special approval
-    loan.status = 'approved';
-    loan.isSpecialApproved = true;
-    loan.specialApprovedAt = new Date();
-    loan.approvedBy = req.user._id;
-    loan.approvalDate = new Date();
-    await loan.save();
+    const updatedLoan = await prisma.loan.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'approved',
+        isSpecialApproved: true,
+        specialApprovedAt: new Date(),
+        approvedBy: req.user.userId,
+        approvalDate: new Date(),
+      },
+    });
 
     // Update user credit score and approved loans count
-    const user = loan.userId;
-    user.creditScore = Math.min(user.creditScore + 100, 1000); // Higher increase for special approval
-    user.totalLoansApproved += 1;
-    await user.save();
+    const user = loan.user;
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        creditScore: Math.min(user.creditScore + 100, 1000), // Higher increase for special approval
+        totalLoansApproved: user.totalLoansApproved + 1,
+      },
+    });
 
     // Send special approval notification
-    await Notification.create({
-      userId: user._id,
-      loanId: loan._id,
-      type: 'loan_approved',
-      title: 'Loan Specially Approved',
-      message: `Congratulations! Your loan of KSh ${loan.amount.toLocaleString()} has been specially approved by our admin team. Funds will be disbursed shortly.`,
-      metadata: {
-        amount: loan.amount,
-        specialApproved: true,
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        loanId: loan.id,
+        title: 'Loan Specially Approved',
+        message: `Congratulations! Your loan of KSh ${loan.amount.toLocaleString()} has been specially approved by our admin team. Funds will be disbursed shortly.`,
       },
     });
 
     // Send approval email asynchronously
-    sendLoanApprovalEmail(user, loan).catch(emailError => {
+    sendLoanApprovalEmail(updatedUser, updatedLoan).catch(emailError => {
       console.error('Failed to send loan approval email:', emailError);
     });
 
     res.json({
       success: true,
       message: 'Loan specially approved successfully',
-      data: loan,
+      data: updatedLoan,
     });
   } catch (error) {
     next(error);
@@ -517,3 +598,4 @@ module.exports = {
   getAdminStats,
   sendApprovalNotification,
 };
+

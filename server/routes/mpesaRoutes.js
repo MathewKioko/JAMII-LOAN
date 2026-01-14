@@ -1,6 +1,5 @@
 const express = require('express');
-const Transaction = require('../models/Transaction');
-const Loan = require('../models/Loan');
+const prisma = require('../config/prisma');
 const { handleMpesaCallback } = require('../utils/mpesa');
 
 const router = express.Router();
@@ -17,44 +16,63 @@ const mpesaCallback = async (req, res) => {
     const result = handleMpesaCallback(callbackData);
 
     if (result.success) {
-      // Find transaction by CheckoutRequestID
-      const transaction = await Transaction.findOne({
-        'mpesaResponse.checkoutRequestID': result.checkoutRequestID,
+      // Find transaction by CheckoutRequestID using Prisma
+      const transaction = await prisma.transaction.findFirst({
+        where: {
+          mpesaResponse: {
+            path: ['checkoutRequestID'],
+            equals: result.checkoutRequestID,
+          },
+        },
       });
 
       if (transaction) {
         // Update transaction status
-        transaction.status = 'success';
-        transaction.mpesaResponse = {
-          ...transaction.mpesaResponse,
-          ...result,
-        };
-        await transaction.save();
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'success',
+            mpesaResponse: {
+              ...transaction.mpesaResponse,
+              ...result,
+            },
+          },
+        });
 
         // Update loan fee status
-        const loan = await Loan.findById(transaction.loanId);
-        if (loan) {
-          loan.feePaid = true;
-          await loan.save();
+        if (transaction.loanId) {
+          await prisma.loan.update({
+            where: { id: transaction.loanId },
+            data: { feePaid: true },
+          });
         }
 
-        console.log('Payment processed successfully for loan:', loan._id);
+        console.log('Payment processed successfully for loan:', transaction.loanId);
       }
     } else {
       // Find transaction and update status to failed
-      const transaction = await Transaction.findOne({
-        'mpesaResponse.checkoutRequestID': result.checkoutRequestID,
+      const transaction = await prisma.transaction.findFirst({
+        where: {
+          mpesaResponse: {
+            path: ['checkoutRequestID'],
+            equals: result.checkoutRequestID,
+          },
+        },
       });
 
       if (transaction) {
-        transaction.status = 'failed';
-        transaction.mpesaResponse = {
-          ...transaction.mpesaResponse,
-          ...result,
-        };
-        await transaction.save();
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'failed',
+            mpesaResponse: {
+              ...transaction.mpesaResponse,
+              ...result,
+            },
+          },
+        });
 
-        console.log('Payment failed for transaction:', transaction._id);
+        console.log('Payment failed for transaction:', transaction.id);
       }
     }
 

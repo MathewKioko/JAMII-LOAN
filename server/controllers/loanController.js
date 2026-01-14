@@ -1,6 +1,4 @@
-const Loan = require('../models/Loan');
-const Transaction = require('../models/Transaction');
-const User = require('../models/User');
+const prisma = require('../config/prisma');
 const { initiateStkPush } = require('../utils/mpesa');
 const { sendLoanApplicationEmail } = require('../utils/email');
 
@@ -10,10 +8,12 @@ const { sendLoanApplicationEmail } = require('../utils/email');
 const applyForLoan = async (req, res, next) => {
   try {
     const { amount, phoneNumber, description } = req.body;
-    const userId = req.user._id;
+    const userId = req.user.userId;
 
     // Check eligibility
-    const user = await User.findById(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
 
     if (!user.isCitizen) {
       return res.status(400).json({
@@ -23,9 +23,11 @@ const applyForLoan = async (req, res, next) => {
     }
 
     // Check for active loans
-    const activeLoans = await Loan.find({
-      userId,
-      status: { $in: ['pending', 'approved'] },
+    const activeLoans = await prisma.loan.findMany({
+      where: {
+        userId,
+        status: { in: ['pending', 'approved'] },
+      },
     });
 
     if (activeLoans.length > 0) {
@@ -47,16 +49,22 @@ const applyForLoan = async (req, res, next) => {
     const feeAmount = Math.round(amount * 0.1);
 
     // Create loan record - NO M-PESA payment at application time
-    const loan = await Loan.create({
-      userId,
-      amount,
-      feeAmount,
-      description,
+    const loan = await prisma.loan.create({
+      data: {
+        userId,
+        amount,
+        feeAmount,
+        description,
+      },
     });
 
     // Update user loan count
-    user.totalLoansApplied += 1;
-    await user.save();
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        totalLoansApplied: user.totalLoansApplied + 1,
+      },
+    });
 
     // Send loan application confirmation email asynchronously
     sendLoanApplicationEmail(user, loan).catch(emailError => {
@@ -68,7 +76,7 @@ const applyForLoan = async (req, res, next) => {
       message: 'Loan application submitted successfully. Your application will be reviewed by our admin team.',
       data: {
         loan: {
-          _id: loan._id,
+          _id: loan.id,
           amount: loan.amount,
           feeAmount: loan.feeAmount,
           status: loan.status,
@@ -89,9 +97,11 @@ const payLoanFee = async (req, res, next) => {
   try {
     const { paymentMethod = 'mock', paymentData } = req.body;
     const loanId = req.params.id;
-    const userId = req.user._id;
+    const userId = req.user.userId;
 
-    const loan = await Loan.findById(loanId);
+    const loan = await prisma.loan.findUnique({
+      where: { id: loanId },
+    });
 
     if (!loan) {
       return res.status(404).json({
@@ -100,7 +110,7 @@ const payLoanFee = async (req, res, next) => {
       });
     }
 
-    if (loan.userId.toString() !== userId.toString()) {
+    if (loan.userId !== userId) {
       return res.status(403).json({
         success: false,
         message: 'Access denied',
@@ -129,22 +139,30 @@ const payLoanFee = async (req, res, next) => {
         paymentMethod,
         paymentData,
         loan.feeAmount,
-        loan._id
+        loan.id
       );
 
-      // Create transaction record
-      await Transaction.create({
-        userId,
-        loanId: loan._id,
-        amount: loan.feeAmount,
-        mpesaResponse: paymentResponse,
-        phoneNumber: paymentData?.phoneNumber || paymentData?.reference,
+// Create transaction record using Prisma
+      await prisma.transaction.create({
+        data: {
+          userId,
+          loanId: loan.id,
+          amount: loan.feeAmount,
+          type: 'LOAN_FEE',
+          status: 'completed',
+          mpesaResponse: paymentResponse,
+          phoneNumber: paymentData?.phoneNumber || paymentData?.reference,
+        },
       });
 
       // Update loan with transaction ID and mark fee as paid
-      loan.mpesaTransactionId = paymentResponse.transactionId || paymentResponse.checkoutRequestID;
-      loan.feePaid = true; // Mark as paid since we're using mock/demo payments
-      await loan.save();
+      await prisma.loan.update({
+        where: { id: loanId },
+        data: {
+          mpesaTransactionId: paymentResponse.transactionId || paymentResponse.checkoutRequestID,
+          feePaid: true, // Mark as paid since we're using mock/demo payments
+        },
+      });
 
       res.json({
         success: true,
@@ -171,3 +189,4 @@ module.exports = {
   applyForLoan,
   payLoanFee,
 };
+

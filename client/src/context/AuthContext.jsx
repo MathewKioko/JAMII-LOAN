@@ -71,15 +71,15 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/login', credentials);
 
       const { data } = response.data;
-      setUser(data);
-      setToken(data.token);
+      setUser(data.user);
+      setToken(data.accessToken);
       setIsAuthenticated(true);
 
       // Store in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data));
+      localStorage.setItem('token', data.accessToken);
+      localStorage.setItem('user', JSON.stringify(data.user));
 
-      return { success: true, data };
+      return { success: true, data: data.user };
     } catch (error) {
       const message = error.response?.data?.message || 'Login failed';
       return { success: false, message };

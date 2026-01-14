@@ -38,16 +38,16 @@ const Register = () => {
       newErrors.fullName = 'Full name is required';
     }
 
-    if (!formData.email) {
+    if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+      newErrors.email = 'Please enter a valid email';
     }
 
-    if (!formData.nationalId) {
+    if (!formData.nationalId.trim()) {
       newErrors.nationalId = 'National ID is required';
-    } else if (!/^\d{8}$/.test(formData.nationalId)) {
-      newErrors.nationalId = 'National ID must be exactly 8 digits';
+    } else if (!/^\d+$/.test(formData.nationalId)) {
+      newErrors.nationalId = 'National ID must be numeric';
     }
 
     if (!formData.password) {
@@ -57,7 +57,7 @@ const Register = () => {
     }
 
     if (!formData.isCitizen) {
-      newErrors.isCitizen = 'You must confirm you are a Kenyan citizen';
+      newErrors.isCitizen = 'You must confirm your citizenship';
     }
 
     setErrors(newErrors);
@@ -189,6 +189,7 @@ const Register = () => {
                 id="isCitizen"
                 name="isCitizen"
                 type="checkbox"
+                required
                 className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 checked={formData.isCitizen}
                 onChange={handleChange}

@@ -1,5 +1,5 @@
 const Flutterwave = require('flutterwave-node-v3');
-const Transaction = require('../models/Transaction');
+const prisma = require('../config/prisma');
 
 // Initialize Flutterwave with environment variables (only if keys are available)
 let flw = null;
@@ -142,8 +142,15 @@ const handleFlutterwaveWebhook = async (webhookData) => {
 
     const { id, tx_ref, status, amount, currency } = webhookData;
 
-    // Find transaction in database
-    const transaction = await Transaction.findOne({ 'mpesaResponse.checkoutRequestID': tx_ref });
+// Find transaction in database using Prisma
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        mpesaResponse: {
+          path: ['checkoutRequestID'],
+          equals: tx_ref,
+        },
+      },
+    });
 
     if (!transaction) {
       console.log('Transaction not found for reference:', tx_ref);
@@ -152,30 +159,48 @@ const handleFlutterwaveWebhook = async (webhookData) => {
 
     // Update transaction status
     if (status === 'successful') {
-      transaction.mpesaResponse.status = 'completed';
-      transaction.mpesaResponse.completedAt = new Date();
-      transaction.mpesaResponse.flutterwaveData = webhookData;
+      // Update transaction with Prisma
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          mpesaResponse: {
+            ...transaction.mpesaResponse,
+            status: 'completed',
+            completedAt: new Date(),
+            flutterwaveData: webhookData,
+          },
+        },
+      });
 
       // Update loan fee status if this was a fee payment
       if (transaction.loanId) {
-        const Loan = require('../models/Loan');
-        const loan = await Loan.findById(transaction.loanId);
+        const loan = await prisma.loan.findUnique({
+          where: { id: transaction.loanId },
+        });
         if (loan && !loan.feePaid) {
-          loan.feePaid = true;
-          await loan.save();
-          console.log('Loan fee marked as paid:', loan._id);
+          await prisma.loan.update({
+            where: { id: transaction.loanId },
+            data: { feePaid: true },
+          });
+          console.log('Loan fee marked as paid:', transaction.loanId);
         }
       }
-
-      await transaction.save();
 
       console.log('Payment completed successfully:', tx_ref);
       return { success: true, message: 'Payment completed successfully' };
     } else if (status === 'failed') {
-      transaction.mpesaResponse.status = 'failed';
-      transaction.mpesaResponse.failedAt = new Date();
-      transaction.mpesaResponse.flutterwaveData = webhookData;
-      await transaction.save();
+      // Update transaction with Prisma
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          mpesaResponse: {
+            ...transaction.mpesaResponse,
+            status: 'failed',
+            failedAt: new Date(),
+            flutterwaveData: webhookData,
+          },
+        },
+      });
 
       console.log('Payment failed:', tx_ref);
       return { success: false, message: 'Payment failed' };
