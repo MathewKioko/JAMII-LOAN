@@ -2,5 +2,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "public",
   "framework": null,
-  "installCommand": "npm run install-all"
+  "installCommand": "npm run install-all",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
