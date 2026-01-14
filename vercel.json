@@ -1,9 +1,8 @@
 {
-  "rootDirectory": "client",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "outputDirectory": "public",
   "framework": null,
-  "installCommand": "npm install",
+  "installCommand": "npm run install-all",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
